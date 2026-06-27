@@ -31,6 +31,9 @@ def _load_api_key():
 GROQ_API_KEY = _load_api_key()
 HOTKEY_BN = "ctrl+shift+b"
 HOTKEY_EN = "ctrl+shift+e"
+# বিকল্প hotkey — যদি মূলটা অন্য software (Avro) দখল করে রাখে
+HOTKEY_BN_ALT = "alt+z"
+HOTKEY_EN_ALT = "alt+x"
 APP_NAME  = "বলো বাংলা এআই"
 APP_EN    = "BoloBangla AI"
 LOGO      = "🤖◀))"
@@ -2359,8 +2362,8 @@ def setup_tray():
     d.ellipse([16,16,48,48],fill="#F42A41")
     menu=pystray.Menu(
         pystray.MenuItem(f"{LOGO} {APP_EN} v{VERSION}",None,enabled=False),
-        pystray.MenuItem(f"বাংলা: {HOTKEY_BN.upper()}",None,enabled=False),
-        pystray.MenuItem(f"English: {HOTKEY_EN.upper()}",None,enabled=False),
+        pystray.MenuItem(f"বাংলা: {HOTKEY_BN.upper()} / {HOTKEY_BN_ALT.upper()}",None,enabled=False),
+        pystray.MenuItem(f"English: {HOTKEY_EN.upper()} / {HOTKEY_EN_ALT.upper()}",None,enabled=False),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Toolbar দেখাও",show_toolbar),
         pystray.MenuItem("বন্ধ করো",quit_app),
@@ -2384,11 +2387,19 @@ def setup_autostart():
         print(f"[!] Auto-startup: {e}")
 
 def hotkey_listener():
-    # প্রথমে suppress=True দিয়ে চেষ্টা করি, fail করলে suppress=False
+    # মূল hotkey + বিকল্প hotkey — দুটোই register করি, যাতে একটা দখল হলেও অন্যটা চলে
+    def _reg(suppress):
+        keyboard.add_hotkey(HOTKEY_BN,lambda:toggle_recording("bn"),suppress=suppress)
+        keyboard.add_hotkey(HOTKEY_EN,lambda:toggle_recording("en"),suppress=suppress)
+        # বিকল্প — আলাদা try, যাতে একটা fail করলেও বাকিগুলো register হয়
+        try: keyboard.add_hotkey(HOTKEY_BN_ALT,lambda:toggle_recording("bn"),suppress=suppress)
+        except: pass
+        try: keyboard.add_hotkey(HOTKEY_EN_ALT,lambda:toggle_recording("en"),suppress=suppress)
+        except: pass
+
     registered = False
     try:
-        keyboard.add_hotkey(HOTKEY_BN,lambda:toggle_recording("bn"),suppress=True)
-        keyboard.add_hotkey(HOTKEY_EN,lambda:toggle_recording("en"),suppress=True)
+        _reg(True)
         registered = True
     except Exception as e:
         print(f"[!] Hotkey (suppress) সমস্যা: {e} — fallback চেষ্টা")
@@ -2397,13 +2408,13 @@ def hotkey_listener():
         except:
             pass
         try:
-            keyboard.add_hotkey(HOTKEY_BN,lambda:toggle_recording("bn"),suppress=False)
-            keyboard.add_hotkey(HOTKEY_EN,lambda:toggle_recording("en"),suppress=False)
+            _reg(False)
             registered = True
         except Exception as e2:
             print(f"[!] Hotkey register ব্যর্থ: {e2}")
     if registered:
-        print(f"[\u2713] বাংলা: {HOTKEY_BN.upper()} | English: {HOTKEY_EN.upper()}")
+        print(f"[\u2713] বাংলা: {HOTKEY_BN.upper()} (বা {HOTKEY_BN_ALT.upper()})")
+        print(f"[\u2713] English: {HOTKEY_EN.upper()} (বা {HOTKEY_EN_ALT.upper()})")
     while app_running:
         time.sleep(0.5)
 
