@@ -1,0 +1,40 @@
+# ─── Secrets & Config (NEVER upload) ───
+.bolobangla_config.json
+*config.json
+.env
+*.key
+secret*
+
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ─── PyInstaller ───
+*.spec
+*.exe
+
+# ─── Audio temp files ───
+*.wav
+temp_*.wav
+
+# ─── IDE ───
+.vscode/
+.idea/
+*.swp
+
+# ─── OS ───
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ─── Logs ───
+*.log
