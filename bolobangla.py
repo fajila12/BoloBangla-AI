@@ -90,6 +90,30 @@ def _kill_stale_instances():
     try:
         import ctypes, subprocess
         my_pid = os.getpid()
+        if getattr(sys, 'frozen', False):
+            # EXE মোড — EXE নাম দিয়ে খোঁজো (যেমন BoloBanglaAI.exe)
+            exe_name = os.path.basename(sys.executable)
+            try:
+                out = subprocess.check_output(
+                    ['tasklist', '/fi', f'IMAGENAME eq {exe_name}', '/fo', 'csv', '/nh'],
+                    stderr=subprocess.DEVNULL, timeout=8
+                ).decode('utf-8', 'ignore')
+                for line in out.splitlines():
+                    parts = [p.strip().strip('"') for p in line.split(',')]
+                    if len(parts) >= 2 and parts[1].isdigit():
+                        pid = parts[1]
+                        if int(pid) != my_pid:
+                            try:
+                                subprocess.run(['taskkill', '/f', '/pid', pid],
+                                               stdout=subprocess.DEVNULL,
+                                               stderr=subprocess.DEVNULL, timeout=5)
+                                print(f"[\u2713] পুরনো instance বন্ধ করা হলো (PID {pid})")
+                            except:
+                                pass
+            except Exception:
+                pass
+            time.sleep(0.5)
+            return
         script_name = os.path.basename(os.path.abspath(__file__)).lower()
         # Find python/pythonw processes running bolobangla
         try:
@@ -760,11 +784,14 @@ class ToolbarWindow:
     def _open_manual(self):
         """Open the PDF user manual"""
         import os, subprocess, sys
-        # Look for manual in same folder as the script
+        # Look for manual in same folder as the script/EXE
         candidates = [
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "BoloBangla_AI_Manual.pdf"),
             os.path.join(os.getcwd(), "BoloBangla_AI_Manual.pdf"),
         ]
+        # EXE হিসেবে চললে EXE-র পাশের folder-ও দেখো
+        if getattr(sys, 'frozen', False):
+            candidates.insert(0, os.path.join(os.path.dirname(sys.executable), "BoloBangla_AI_Manual.pdf"))
         manual_path = None
         for c in candidates:
             if os.path.exists(c):
@@ -2378,9 +2405,14 @@ def setup_autostart():
         key=winreg.OpenKey(winreg.HKEY_CURRENT_USER,
                            r"Software\Microsoft\Windows\CurrentVersion\Run",
                            0,winreg.KEY_SET_VALUE)
-        pythonw = sys.executable.replace('python.exe','pythonw.exe')
-        winreg.SetValueEx(key,APP_EN,0,winreg.REG_SZ,
-                          f'"{pythonw}" "{os.path.abspath(__file__)}"')
+        if getattr(sys, 'frozen', False):
+            # EXE হিসেবে চলছে — সরাসরি EXE path দাও
+            cmd = f'"{sys.executable}"'
+        else:
+            # Python script হিসেবে চলছে — pythonw দিয়ে script চালাও
+            pythonw = sys.executable.replace('python.exe','pythonw.exe')
+            cmd = f'"{pythonw}" "{os.path.abspath(__file__)}"'
+        winreg.SetValueEx(key,APP_EN,0,winreg.REG_SZ,cmd)
         winreg.CloseKey(key)
         print("[✓] Auto-startup সেট হয়েছে")
     except Exception as e:
