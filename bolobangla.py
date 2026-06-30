@@ -141,20 +141,15 @@ def _kill_stale_instances():
     except Exception as e:
         print(f"[!] Stale cleanup: {e}")
 
-def check_single_instance(_retry=True):
+def check_single_instance():
+    # প্রথমে সবসময় পুরনো instance পরিষ্কার করি (SO_REUSEADDR ছাড়া)
+    _kill_stale_instances()
     try:
         s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(("127.0.0.1",47291))
         s.listen(1)
         return s
     except OSError:
-        # পুরনো instance আটকে আছে — সেটা বন্ধ করে আবার চেষ্টা করি
-        if _retry:
-            print("[!] পুরনো BoloBangla AI পরিষ্কার করা হচ্ছে...")
-            _kill_stale_instances()
-            time.sleep(1.0)
-            return check_single_instance(_retry=False)
         print("[!] BoloBangla AI আগে থেকেই চলছে!")
         sys.exit(0)
 
