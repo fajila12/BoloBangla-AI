@@ -29,11 +29,9 @@ def _load_api_key():
     return os.environ.get("GROQ_API_KEY", "")
 
 GROQ_API_KEY = _load_api_key()
-HOTKEY_BN = "ctrl+shift+b"
-HOTKEY_EN = "ctrl+shift+e"
-# বিকল্প hotkey — যদি মূলটা অন্য software (Avro) দখল করে রাখে
-HOTKEY_BN_ALT = "alt+z"
-HOTKEY_EN_ALT = "alt+x"
+# Function key — কোনো software/IME দখল করে না, তাই সবসময় নির্ভরযোগ্য
+HOTKEY_BN = "ctrl+shift+space"
+HOTKEY_EN = "ctrl+alt+space"
 APP_NAME  = "বলো বাংলা এআই"
 APP_EN    = "BoloBangla AI"
 LOGO      = "🤖◀))"
@@ -216,9 +214,9 @@ class WelcomeScreen:
             {"icon":"🤖◀))","title":"স্বাগতম!","color":"#00E676",
              "desc":f"{APP_NAME}\nযেকোনো অ্যাপে বাংলা বা English বলুন\nলেখা automatically টাইপ হবে!"},
             {"icon":"⌨️","title":"হটকি শিখুন","color":"#F42A41",
-             "desc":"বাংলা লিখতে: Ctrl + Shift + B\nEnglish লিখতে: Ctrl + Shift + E\nআবার চাপুন = রেকর্ড বন্ধ"},
+             "desc":"বাংলা: Ctrl+Shift+Space\nEnglish: Ctrl+Alt+Space\nআবার চাপুন = রেকর্ড বন্ধ"},
             {"icon":"🗣️","title":"বলুন এবং লিখুন","color":"#00C853",
-             "desc":"🟢 Ctrl+Shift+B চেপে বাংলায় বলুন\n🔵 Ctrl+Shift+E চেপে English বলুন\nলাল বাতি জ্বললে রেকর্ড চলছে"},
+             "desc":"🟢 Ctrl+Shift+Space চেপে বাংলায় বলুন\n🔵 Ctrl+Alt+Space চেপে English বলুন\nটুলবারের 🎙 বোতামেও ক্লিক করতে পারেন"},
             {"icon":"💡","title":"Punctuation Commands","color":"#F42A41",
              "desc":"বাংলা: কমা→, | দাড়ি→। | সেমি→; | কোলন→:\nবাংলা: জিজ্ঞাসা→? | বিস্ময়→! | ড্যাশ→—\nEnglish: comma→, | period→. | semi→;\nnew line / নতুন লাইন → ↵"},
             {"icon":"🎙️","title":"Mic টিপস","color":"#00C853",
@@ -1008,21 +1006,41 @@ class IndicatorWindow:
         self.cv.create_polygon(pts,smooth=True,fill="#0D5C2E",outline="#00A550",width=2)
         self.dot=self.cv.create_oval(18,26,34,42,fill="#4a4a6a",outline="")
         self.txt1=self.cv.create_text(48,24,anchor="w",text=f"{LOGO} {APP_EN} | {APP_NAME}",fill="#E8F5E9",font=("Segoe UI",9,"bold"))
-        self.txt2=self.cv.create_text(48,44,anchor="w",text="Ctrl+Shift+B/E চাপুন",fill="#5A9E82",font=("Segoe UI",8))
+        self.txt2=self.cv.create_text(48,44,anchor="w",text="Ctrl+Shift+Space = বাংলা",fill="#5A9E82",font=("Segoe UI",8))
         self._pulse_on=False
         self._pulse_job=None
         self.root.withdraw()
 
+    def _cancel_hide(self):
+        """পুরনো লুকানোর timer বাতিল করে — না হলে নতুন রেকর্ডিং চলাকালীন
+        আগের timer bar লুকিয়ে দেয়।"""
+        job = getattr(self, "_hide_job", None)
+        if job:
+            try:
+                self.root.after_cancel(job)
+            except Exception:
+                pass
+        self._hide_job = None
+
+    def _schedule_hide(self, ms, fn):
+        self._cancel_hide()
+        try:
+            self._hide_job = self.root.after(ms, fn)
+        except Exception:
+            self._hide_job = None
+
     def show_idle(self):
+        self._cancel_hide()
         self.root.deiconify()
         self.cv.itemconfig(self.dot,fill="#00A550")
         self.cv.itemconfig(self.txt1,text=f"{LOGO} {APP_EN}",fill="#E8F5E9")
-        self.cv.itemconfig(self.txt2,text="Ctrl+Shift+B/E চাপুন",fill="#5A9E82")
+        self.cv.itemconfig(self.txt2,text="Ctrl+Shift+Space = বাংলা",fill="#5A9E82")
         self._stop_pulse()
         if toolbar_win:
             toolbar_win.update_status("● প্রস্তুত","#00C853")
 
     def show_recording(self,lang="bn"):
+        self._cancel_hide()
         self.root.deiconify()
         self.cv.itemconfig(self.dot,fill="#e63946")
         if lang=="bn":
@@ -1036,13 +1054,15 @@ class IndicatorWindow:
             toolbar_win.update_mode(lang)
 
     def show_processing(self):
+        self._cancel_hide()
         self.cv.itemconfig(self.dot,fill="#f9a825")
         self.cv.itemconfig(self.txt1,text="⟳ প্রসেস হচ্ছে...",fill="#ffd166")
         self.cv.itemconfig(self.txt2,text="একটু অপেক্ষা করুন",fill="#aaaacc")
         self._stop_pulse()
-        self.root.after(8000,self.root.withdraw)
+        self._schedule_hide(8000, self.root.withdraw)
 
     def show_ai_polish(self):
+        self._cancel_hide()
         self.root.deiconify()
         self.cv.itemconfig(self.dot,fill="#a855f7")
         self.cv.itemconfig(self.txt1,text="✨ AI সাজাচ্ছে...",fill="#c084fc")
@@ -1067,7 +1087,7 @@ class IndicatorWindow:
         self.cv.itemconfig(self.txt1, text="✓ Ready! Ctrl+V চাপুন", fill="#00E676")
         self.cv.itemconfig(self.txt2, text=s if s else "লেখা clipboard-এ আছে", fill="#ffd166")
         self._stop_pulse()
-        self.root.after(8000, self._auto_hide)
+        self._schedule_hide(8000, self._auto_hide)
 
     def _do_paste(self, event=None):
         """Paste when indicator clicked - minimize indicator first then paste"""
@@ -2202,7 +2222,7 @@ def transcribe(path,lang):
     r=sr.Recognizer()
     r.energy_threshold=200
     r.dynamic_energy_threshold=True
-    r.operation_timeout=8
+    r.operation_timeout=30   # লম্বা রেকর্ডিং upload+প্রসেস হতে সময় লাগে
     with sr.AudioFile(path) as src:
         r.adjust_for_ambient_noise(src,duration=0.2)
         audio=r.record(src)
@@ -2384,8 +2404,8 @@ def setup_tray():
     d.ellipse([16,16,48,48],fill="#F42A41")
     menu=pystray.Menu(
         pystray.MenuItem(f"{LOGO} {APP_EN} v{VERSION}",None,enabled=False),
-        pystray.MenuItem(f"বাংলা: {HOTKEY_BN.upper()} / {HOTKEY_BN_ALT.upper()}",None,enabled=False),
-        pystray.MenuItem(f"English: {HOTKEY_EN.upper()} / {HOTKEY_EN_ALT.upper()}",None,enabled=False),
+        pystray.MenuItem("বাংলা: Ctrl+Shift+Space",None,enabled=False),
+        pystray.MenuItem("English: Ctrl+Alt+Space",None,enabled=False),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Toolbar দেখাও",show_toolbar),
         pystray.MenuItem("বন্ধ করো",quit_app),
@@ -2393,6 +2413,50 @@ def setup_tray():
     icon = pystray.Icon(APP_EN,img,APP_EN,menu)
     icon.default_action = show_toolbar
     return icon
+
+def create_shortcuts():
+    """প্রথমবার চালু হলে Start Menu ও Desktop-এ shortcut তৈরি করে,
+    যাতে user Windows Search-এ "BoloBangla" লিখেই খুঁজে পায়।
+    শুধু EXE মোডে কাজ করে।"""
+    if not getattr(sys, 'frozen', False):
+        return
+    try:
+        target = sys.executable
+        workdir = os.path.dirname(target)
+        start_dir = os.path.join(os.environ.get("APPDATA",""),
+                                 r"Microsoft\Windows\Start Menu\Programs")
+        desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+
+        made = []
+        for folder in (start_dir, desktop):
+            if not folder or not os.path.isdir(folder):
+                continue
+            lnk = os.path.join(folder, "BoloBangla AI.lnk")
+            if os.path.exists(lnk):
+                continue
+            # PowerShell দিয়ে shortcut তৈরি (বাড়তি library লাগে না)
+            ps = (
+                "$s=(New-Object -COM WScript.Shell).CreateShortcut('%s');"
+                "$s.TargetPath='%s';"
+                "$s.WorkingDirectory='%s';"
+                "$s.Description='BoloBangla AI - kotha bole bangla likhun';"
+                "$s.Save()" % (lnk.replace("'","''"),
+                               target.replace("'","''"),
+                               workdir.replace("'","''"))
+            )
+            try:
+                import subprocess
+                subprocess.run(["powershell","-NoProfile","-WindowStyle","Hidden",
+                                "-Command", ps],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                               timeout=15)
+                made.append(folder)
+            except Exception:
+                pass
+        if made:
+            print("[\u2713] Shortcut তৈরি হয়েছে (Start Menu / Desktop)")
+    except Exception as e:
+        print(f"[!] Shortcut: {e}")
 
 def setup_autostart():
     try:
@@ -2414,34 +2478,42 @@ def setup_autostart():
         print(f"[!] Auto-startup: {e}")
 
 def hotkey_listener():
-    # মূল hotkey + বিকল্প hotkey — দুটোই register করি, যাতে একটা দখল হলেও অন্যটা চলে
-    def _reg(suppress):
-        keyboard.add_hotkey(HOTKEY_BN,lambda:toggle_recording("bn"),suppress=suppress)
-        keyboard.add_hotkey(HOTKEY_EN,lambda:toggle_recording("en"),suppress=suppress)
-        # বিকল্প — আলাদা try, যাতে একটা fail করলেও বাকিগুলো register হয়
-        try: keyboard.add_hotkey(HOTKEY_BN_ALT,lambda:toggle_recording("bn"),suppress=suppress)
-        except: pass
-        try: keyboard.add_hotkey(HOTKEY_EN_ALT,lambda:toggle_recording("en"),suppress=suppress)
-        except: pass
-
-    registered = False
+    """Windows GetAsyncKeyState দিয়ে সরাসরি key পড়ি।
+    keyboard library-র hook পদ্ধতি অনেক PC-তে permission/conflict-এর কারণে
+    কাজ করে না — এই পদ্ধতিতে কোনো hook বা admin লাগে না, তাই নির্ভরযোগ্য।"""
+    VK_F9, VK_F10 = 0x78, 0x79
+    VK_CTRL, VK_SHIFT, VK_ALT, VK_SPACE = 0x11, 0x10, 0x12, 0x20
     try:
-        _reg(True)
-        registered = True
+        import ctypes
+        user32 = ctypes.windll.user32
+        down = lambda vk: bool(user32.GetAsyncKeyState(vk) & 0x8000)
+        print("[\u2713] বাংলা:  Ctrl+Shift+Space  অথবা  F9")
+        print("[\u2713] English: Ctrl+Alt+Space    অথবা  F10")
+
+        prev_bn = prev_en = False
+        while app_running:
+            # polling পদ্ধতি hook-এর নিচ দিয়ে পড়ে, তাই Avro দখল করলেও কাজ করে
+            ctrl, shift, alt, space = down(VK_CTRL), down(VK_SHIFT), down(VK_ALT), down(VK_SPACE)
+            now_bn = down(VK_F9)  or (ctrl and shift and not alt and space)
+            now_en = down(VK_F10) or (ctrl and alt and not shift and space)
+            # শুধু "চাপা হলো" মুহূর্তে trigger (ধরে রাখলে বারবার নয়)
+            if now_bn and not prev_bn:
+                toggle_recording("bn")
+            if now_en and not prev_en:
+                toggle_recording("en")
+            prev_bn, prev_en = now_bn, now_en
+            time.sleep(0.04)
+        return
     except Exception as e:
-        print(f"[!] Hotkey (suppress) সমস্যা: {e} — fallback চেষ্টা")
-        try:
-            keyboard.unhook_all_hotkeys()
-        except:
-            pass
-        try:
-            _reg(False)
-            registered = True
-        except Exception as e2:
-            print(f"[!] Hotkey register ব্যর্থ: {e2}")
-    if registered:
-        print(f"[\u2713] বাংলা: {HOTKEY_BN.upper()} (বা {HOTKEY_BN_ALT.upper()})")
-        print(f"[\u2713] English: {HOTKEY_EN.upper()} (বা {HOTKEY_EN_ALT.upper()})")
+        print(f"[!] Key listener সমস্যা: {e} — keyboard library দিয়ে চেষ্টা")
+
+    # শেষ চেষ্টা: keyboard library
+    try:
+        keyboard.add_hotkey(HOTKEY_BN,lambda:toggle_recording("bn"),suppress=False)
+        keyboard.add_hotkey(HOTKEY_EN,lambda:toggle_recording("en"),suppress=False)
+        print(f"[\u2713] বাংলা: {HOTKEY_BN.upper()} | English: {HOTKEY_EN.upper()}")
+    except Exception as e2:
+        print(f"[!] Hotkey register ব্যর্থ: {e2}")
     while app_running:
         time.sleep(0.5)
 
@@ -2457,6 +2529,7 @@ def start_app():
     except Exception as e:
         print(f"[!] Mic check: {e}")
     setup_autostart()
+    create_shortcuts()
 
     indicator_win=IndicatorWindow()
     toolbar_win=ToolbarWindow()
@@ -2466,7 +2539,7 @@ def start_app():
     threading.Thread(target=tray.run,daemon=True).start()
 
     indicator_win.root.after(500,indicator_win.show_idle)
-    indicator_win.root.after(4000,indicator_win.root.withdraw)
+    indicator_win.root.after(500, lambda: indicator_win._schedule_hide(3500, indicator_win.root.withdraw))
 
     print(f"[✓] {LOGO} {APP_EN} v{VERSION} চালু!")
     print(f"    {HOTKEY_BN.upper()} = বাংলা | {HOTKEY_EN.upper()} = English\n")
